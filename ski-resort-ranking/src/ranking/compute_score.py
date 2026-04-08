@@ -1,20 +1,35 @@
 from pathlib import Path
+
 import pandas as pd
 
 
 def compute_scores(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
 
-    # snowfall 越大越好
+    # More snowfall is better.
     df["snow_score"] = df["snowfall"]
 
-    # temperature 越接近 0 越好
+    # Temperature closer to 0C is better.
     df["temp_score"] = -abs(df["temperature"] - 0)
 
-    # 总分
     df["overall_score"] = df["snow_score"] + df["temp_score"]
 
     return df
+
+
+def save_scored_data(
+    df: pd.DataFrame,
+    output_path: Path | None = None,
+) -> Path:
+    project_root = Path(__file__).resolve().parents[2]
+    processed_dir = project_root / "data" / "processed"
+    processed_dir.mkdir(parents=True, exist_ok=True)
+
+    output_file = output_path or (processed_dir / "weather_scored.csv")
+    df.to_csv(output_file, index=False)
+
+    print(f"\nSaved scored data to: {output_file}")
+    return output_file
 
 
 def main():
@@ -30,9 +45,7 @@ def main():
     print("Score preview:")
     print(scored_df.head())
 
-    scored_df.to_csv(output_file, index=False)
-
-    print(f"\nSaved scored data to: {output_file}")
+    save_scored_data(scored_df, output_file)
 
 
 if __name__ == "__main__":

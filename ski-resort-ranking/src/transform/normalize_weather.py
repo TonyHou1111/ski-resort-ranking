@@ -1,4 +1,5 @@
 from pathlib import Path
+
 import pandas as pd
 
 
@@ -19,6 +20,21 @@ def normalize_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     return normalized_df
 
 
+def save_normalized_data(
+    df: pd.DataFrame,
+    output_path: Path | None = None,
+) -> Path:
+    project_root = Path(__file__).resolve().parents[2]
+    processed_dir = project_root / "data" / "processed"
+    processed_dir.mkdir(parents=True, exist_ok=True)
+
+    output_file = output_path or (processed_dir / "weather_normalized.csv")
+    df.to_csv(output_file, index=False)
+
+    print(f"\nSaved normalized data to: {output_file}")
+    return output_file
+
+
 def main():
     project_root = Path(__file__).resolve().parents[2]
     input_file = project_root / "data" / "processed" / "weather_cleaned.csv"
@@ -36,10 +52,7 @@ def main():
     print("\nRow count by resort:")
     print(normalized_df["resort_name"].value_counts())
 
-    output_file.parent.mkdir(parents=True, exist_ok=True)
-    normalized_df.to_csv(output_file, index=False)
-
-    print(f"\nSaved normalized data to: {output_file}")
+    save_normalized_data(normalized_df, output_file)
 
 
 if __name__ == "__main__":

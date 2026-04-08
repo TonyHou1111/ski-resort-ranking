@@ -51,9 +51,9 @@ def fetch_weather_data() -> list:
     return all_results
 
 
-def save_raw_data(data: list):
+def save_raw_data(data: list, output_dir: Path | None = None) -> Path:
     project_root = Path(__file__).resolve().parents[2]
-    output_dir = project_root / "data" / "raw"
+    output_dir = output_dir or (project_root / "data" / "raw")
     output_dir.mkdir(parents=True, exist_ok=True)
 
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
@@ -63,6 +63,7 @@ def save_raw_data(data: list):
         json.dump(data, f, indent=2)
 
     print(f"Saved raw data to: {output_file}")
+    return output_file
 
 
 if __name__ == "__main__":

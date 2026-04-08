@@ -1,4 +1,5 @@
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pandas as pd
@@ -27,19 +28,42 @@ def load_scored_data() -> pd.DataFrame:
     return pd.read_csv(input_file)
 
 
+def _serialize_value(value):
+    if pd.isna(value):
+        return None
+    if isinstance(value, pd.Timestamp):
+        return value.isoformat()
+    return value
+
+
 def dataframe_to_messages(df: pd.DataFrame) -> list[dict]:
-    return df.to_dict(orient="records")
+    batch_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    ingest_time = datetime.now(timezone.utc).isoformat()
+    messages = []
+
+    for row in df.to_dict(orient="records"):
+        message = {key: _serialize_value(value) for key, value in row.items()}
+        message["ingest_time"] = ingest_time
+        message["batch_id"] = batch_id
+        messages.append(message)
+
+    return messages
 
 
-def publish_messages(messages: list[dict]):
-    producer = create_producer()
+def publish_messages(
+    messages: list[dict],
+    producer: KafkaProducer | None = None,
+):
+    owns_producer = producer is None
+    producer = producer or create_producer()
 
     for message in messages:
         key = message["resort_id"]
         producer.send(TOPIC_NAME, key=key, value=message)
 
     producer.flush()
-    producer.close()
+    if owns_producer:
+        producer.close()
 
     print(f"Published {len(messages)} messages to topic '{TOPIC_NAME}'")
 
@@ -48,8 +72,9 @@ def main():
     df = load_scored_data()
     messages = dataframe_to_messages(df)
 
-    print("Sample message:")
-    print(messages[0])
+    if messages:
+        print("Sample message:")
+        print(messages[0])
 
     publish_messages(messages)
 

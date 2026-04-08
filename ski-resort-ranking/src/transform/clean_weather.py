@@ -44,9 +44,7 @@ def transform_one_resort(raw: dict) -> pd.DataFrame:
 
 
 def transform_weather_data(raw_data) -> pd.DataFrame:
-    # raw_data 现在是 list
     all_dfs = [transform_one_resort(raw) for raw in raw_data]
-
     df = pd.concat(all_dfs, ignore_index=True)
 
     df["time"] = pd.to_datetime(df["time"], errors="coerce")
@@ -57,15 +55,19 @@ def transform_weather_data(raw_data) -> pd.DataFrame:
     return df
 
 
-def save_processed_data(df: pd.DataFrame):
+def save_processed_data(
+    df: pd.DataFrame,
+    output_path: Path | None = None,
+) -> Path:
     project_root = Path(__file__).resolve().parents[2]
     processed_dir = project_root / "data" / "processed"
     processed_dir.mkdir(parents=True, exist_ok=True)
 
-    output_file = processed_dir / "weather_cleaned.csv"
+    output_file = output_path or (processed_dir / "weather_cleaned.csv")
     df.to_csv(output_file, index=False)
 
     print(f"Saved cleaned data to: {output_file}")
+    return output_file
 
 
 if __name__ == "__main__":
