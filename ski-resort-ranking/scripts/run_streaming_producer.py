@@ -17,8 +17,9 @@ from src.transform.normalize_weather import normalize_dataframe, save_normalized
 
 def run_batch(
     save_intermediate: bool = True,
-    output_mode: str = "file",
+    output_mode: str = "kafka",
     landing_dir: Path | None = None,
+    bootstrap_servers: str | None = None,
 ) -> int:
     raw_data = fetch_weather_data()
 
@@ -39,15 +40,15 @@ def run_batch(
         print("No messages generated for this batch.")
         return 0
 
-    if output_mode == "kafka":
-        producer = create_producer()
+    if output_mode == "file":
+        target_dir = landing_dir or (PROJECT_ROOT / "data" / "landing")
+        write_jsonl_batch(messages, target_dir)
+    else:
+        producer = create_producer(bootstrap_servers=bootstrap_servers)
         try:
             publish_messages(messages, producer=producer)
         finally:
             producer.close()
-    else:
-        target_dir = landing_dir or (PROJECT_ROOT / "data" / "landing")
-        write_jsonl_batch(messages, target_dir)
 
     print(f"Batch complete. Produced {len(messages)} messages.")
     return len(messages)
@@ -56,8 +57,9 @@ def run_batch(
 def run_loop(
     interval_minutes: float,
     save_intermediate: bool = True,
-    output_mode: str = "file",
+    output_mode: str = "kafka",
     landing_dir: Path | None = None,
+    bootstrap_servers: str | None = None,
 ) -> None:
     interval_seconds = max(interval_minutes, 0.1) * 60
 
@@ -67,6 +69,7 @@ def run_loop(
             save_intermediate=save_intermediate,
             output_mode=output_mode,
             landing_dir=landing_dir,
+            bootstrap_servers=bootstrap_servers,
         )
         print(f"Sleeping for {interval_minutes} minute(s)...")
         time.sleep(interval_seconds)
@@ -94,9 +97,14 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--output-mode",
-        choices=["file", "kafka"],
-        default="file",
-        help="Where to send scored records. Default: file",
+        choices=["kafka", "file"],
+        default="kafka",
+        help="Where to send scored records. Default: kafka",
+    )
+    parser.add_argument(
+        "--bootstrap-servers",
+        default=None,
+        help="Kafka bootstrap servers. Defaults to KAFKA_BOOTSTRAP_SERVERS or localhost:9092.",
     )
     parser.add_argument(
         "--landing-dir",
@@ -116,6 +124,7 @@ def main() -> None:
             save_intermediate=save_intermediate,
             output_mode=args.output_mode,
             landing_dir=landing_dir,
+            bootstrap_servers=args.bootstrap_servers,
         )
     else:
         run_loop(
@@ -123,6 +132,7 @@ def main() -> None:
             save_intermediate=save_intermediate,
             output_mode=args.output_mode,
             landing_dir=landing_dir,
+            bootstrap_servers=args.bootstrap_servers,
         )
 
 

@@ -8,12 +8,13 @@ from pyspark.sql.types import DoubleType, StringType, StructField, StructType
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+DEFAULT_KAFKA_PACKAGE = "org.apache.spark:spark-sql-kafka-0-10_2.13:4.0.1"
 
 
-def build_spark_session() -> SparkSession:
+def build_spark_session(source: str) -> SparkSession:
     builder = (
         SparkSession.builder
-        .appName("SkiResortFileStreaming")
+        .appName("SkiResortStreaming")
         .config("spark.sql.shuffle.partitions", "2")
     )
 
@@ -23,6 +24,9 @@ def build_spark_session() -> SparkSession:
         builder = builder.master(f"spark://{slurmd_nodename}:{spark_master_port}")
     else:
         builder = builder.master("local[*]")
+
+    if source == "kafka":
+        builder = builder.config("spark.jars.packages", DEFAULT_KAFKA_PACKAGE)
 
     return builder.getOrCreate()
 
@@ -43,7 +47,26 @@ def get_schema() -> StructType:
     ])
 
 
-def build_stream(spark: SparkSession, input_dir: str):
+def build_kafka_stream(spark: SparkSession, bootstrap_servers: str, topic: str):
+    schema = get_schema()
+
+    return (
+        spark.readStream
+        .format("kafka")
+        .option("kafka.bootstrap.servers", bootstrap_servers)
+        .option("subscribe", topic)
+        .option("startingOffsets", "latest")
+        .load()
+        .selectExpr("CAST(value AS STRING) AS payload")
+        .select(F.from_json("payload", schema).alias("data"))
+        .select("data.*")
+        .withColumn("event_time", F.to_timestamp("event_time"))
+        .withColumn("ingest_time", F.to_timestamp("ingest_time"))
+        .withWatermark("ingest_time", "30 minutes")
+    )
+
+
+def build_file_stream(spark: SparkSession, input_dir: str):
     return (
         spark.readStream
         .schema(get_schema())
@@ -72,16 +95,32 @@ def build_summary(stream_df):
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Read scored weather batches from a landing folder with Spark Structured Streaming.",
+        description="Run Spark Structured Streaming on Kafka or file-based ski weather batches.",
+    )
+    parser.add_argument(
+        "--source",
+        choices=["kafka", "file"],
+        default="kafka",
+        help="Streaming input source. Default: kafka",
+    )
+    parser.add_argument(
+        "--bootstrap-servers",
+        default=os.getenv("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092"),
+        help="Kafka bootstrap servers for kafka source.",
+    )
+    parser.add_argument(
+        "--topic",
+        default=os.getenv("KAFKA_TOPIC", "ski_weather_scored"),
+        help="Kafka topic for kafka source.",
     )
     parser.add_argument(
         "--input-dir",
         default=str(PROJECT_ROOT / "data" / "landing"),
-        help="Directory containing JSON batch files.",
+        help="Directory containing JSON batch files for file source.",
     )
     parser.add_argument(
         "--checkpoint-dir",
-        default=str(PROJECT_ROOT / "tmp" / "checkpoint_file_stream"),
+        default=str(PROJECT_ROOT / "tmp" / "checkpoint_streaming"),
         help="Checkpoint directory for Spark Structured Streaming.",
     )
     parser.add_argument(
@@ -106,12 +145,19 @@ def parse_args() -> argparse.Namespace:
 
 def main():
     args = parse_args()
-    spark = build_spark_session()
+    spark = build_spark_session(args.source)
     spark.sparkContext.setLogLevel("WARN")
 
-    stream_df = build_stream(spark, args.input_dir)
-    summary_df = build_summary(stream_df)
+    if args.source == "kafka":
+        stream_df = build_kafka_stream(
+            spark=spark,
+            bootstrap_servers=args.bootstrap_servers,
+            topic=args.topic,
+        )
+    else:
+        stream_df = build_file_stream(spark, args.input_dir)
 
+    summary_df = build_summary(stream_df)
     writer = (
         summary_df.writeStream
         .outputMode(args.stream_output_mode)

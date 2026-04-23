@@ -1,4 +1,5 @@
 import json
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -7,15 +8,19 @@ from kafka import KafkaProducer
 
 
 TOPIC_NAME = "ski_weather_scored"
+DEFAULT_BOOTSTRAP_SERVERS = "localhost:9092"
 
 
-def create_producer() -> KafkaProducer:
-    producer = KafkaProducer(
-        bootstrap_servers="localhost:9092",
+def get_bootstrap_servers() -> str:
+    return os.getenv("KAFKA_BOOTSTRAP_SERVERS", DEFAULT_BOOTSTRAP_SERVERS)
+
+
+def create_producer(bootstrap_servers: str | None = None) -> KafkaProducer:
+    return KafkaProducer(
+        bootstrap_servers=bootstrap_servers or get_bootstrap_servers(),
         value_serializer=lambda v: json.dumps(v).encode("utf-8"),
         key_serializer=lambda k: k.encode("utf-8") if k else None,
     )
-    return producer
 
 
 def load_scored_data() -> pd.DataFrame:
@@ -58,14 +63,16 @@ def publish_messages(
     producer = producer or create_producer()
 
     for message in messages:
-        key = message["resort_id"]
-        producer.send(TOPIC_NAME, key=key, value=message)
+        producer.send(TOPIC_NAME, key=message["resort_id"], value=message)
 
     producer.flush()
     if owns_producer:
         producer.close()
 
-    print(f"Published {len(messages)} messages to topic '{TOPIC_NAME}'")
+    print(
+        f"Published {len(messages)} messages to topic '{TOPIC_NAME}' "
+        f"on {get_bootstrap_servers()}"
+    )
 
 
 def main():
