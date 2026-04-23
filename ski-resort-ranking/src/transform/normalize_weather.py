@@ -7,6 +7,12 @@ def make_resort_id(resort_name: str) -> str:
     return resort_name.lower().replace(" ", "_")
 
 
+def get_numeric_column(df: pd.DataFrame, column_name: str) -> pd.Series:
+    if column_name not in df.columns:
+        return pd.Series([float("nan")] * len(df), index=df.index, dtype="float64")
+    return pd.to_numeric(df[column_name], errors="coerce")
+
+
 def normalize_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     normalized_df = pd.DataFrame()
 
@@ -14,8 +20,10 @@ def normalize_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     normalized_df["resort_name"] = df["resort_name"]
     normalized_df["fetched_at"] = pd.to_datetime(df["fetched_at"])
     normalized_df["event_time"] = pd.to_datetime(df["time"])
-    normalized_df["snowfall"] = pd.to_numeric(df["snowfall"], errors="coerce")
-    normalized_df["temperature"] = pd.to_numeric(df["temperature_2m"], errors="coerce")
+    normalized_df["snowfall"] = get_numeric_column(df, "snowfall")
+    normalized_df["temperature"] = get_numeric_column(df, "temperature_2m")
+    normalized_df["wind_speed"] = get_numeric_column(df, "wind_speed_10m")
+    normalized_df["snow_depth"] = get_numeric_column(df, "snow_depth")
 
     return normalized_df
 

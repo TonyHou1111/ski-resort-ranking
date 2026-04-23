@@ -4,6 +4,13 @@ from pathlib import Path
 import pandas as pd
 
 
+def get_hourly_values(hourly: dict, key: str, expected_length: int) -> list:
+    values = hourly.get(key)
+    if values is None:
+        return [None] * expected_length
+    return list(values)
+
+
 def get_latest_raw_file():
     project_root = Path(__file__).resolve().parents[2]
     raw_dir = project_root / "data" / "raw"
@@ -27,10 +34,12 @@ def transform_one_resort(raw: dict) -> pd.DataFrame:
 
     hourly = raw.get("raw_data", {}).get("hourly", {})
     times = hourly.get("time", [])
-    snowfall = hourly.get("snowfall", [])
-    temperatures = hourly.get("temperature_2m", [])
+    snowfall = get_hourly_values(hourly, "snowfall", len(times))
+    temperatures = get_hourly_values(hourly, "temperature_2m", len(times))
+    wind_speeds = get_hourly_values(hourly, "wind_speed_10m", len(times))
+    snow_depth = get_hourly_values(hourly, "snow_depth", len(times))
 
-    min_len = min(len(times), len(snowfall), len(temperatures))
+    min_len = min(len(times), len(snowfall), len(temperatures), len(wind_speeds), len(snow_depth))
 
     df = pd.DataFrame({
         "resort_name": [resort_name] * min_len,
@@ -38,6 +47,8 @@ def transform_one_resort(raw: dict) -> pd.DataFrame:
         "time": times[:min_len],
         "snowfall": snowfall[:min_len],
         "temperature_2m": temperatures[:min_len],
+        "wind_speed_10m": wind_speeds[:min_len],
+        "snow_depth": snow_depth[:min_len],
     })
 
     return df
@@ -51,6 +62,8 @@ def transform_weather_data(raw_data) -> pd.DataFrame:
     df["fetched_at"] = pd.to_datetime(df["fetched_at"], errors="coerce")
     df["snowfall"] = pd.to_numeric(df["snowfall"], errors="coerce")
     df["temperature_2m"] = pd.to_numeric(df["temperature_2m"], errors="coerce")
+    df["wind_speed_10m"] = pd.to_numeric(df["wind_speed_10m"], errors="coerce")
+    df["snow_depth"] = pd.to_numeric(df["snow_depth"], errors="coerce")
 
     return df
 
