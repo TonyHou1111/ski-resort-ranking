@@ -1,10 +1,13 @@
 .venv/
+.secrets/
 __pycache__/
 *.pyc
 .env
 data/raw/*
 data/processed/*
 data/final/*
+data/out/
+tmp/
 !data/raw/.gitkeep
 !data/processed/.gitkeep
 !data/final/.gitkeep

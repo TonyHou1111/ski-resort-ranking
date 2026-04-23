@@ -1,5 +1,7 @@
 import argparse
 import os
+import shutil
+import subprocess
 from pathlib import Path
 
 from pyspark.sql import SparkSession
@@ -8,7 +10,45 @@ from pyspark.sql.types import DoubleType, StringType, StructField, StructType
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_KAFKA_PACKAGE = "org.apache.spark:spark-sql-kafka-0-10_2.13:4.0.1"
+DEFAULT_KAFKA_PACKAGE = "org.apache.spark:spark-sql-kafka-0-10_2.13:4.1.1"
+DEFAULT_JAVA_HOME_CANDIDATES = [
+    Path("/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home"),
+    Path("/usr/local/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home"),
+]
+
+
+def ensure_java_home() -> None:
+    java_home = os.environ.get("JAVA_HOME")
+    if java_home and _java_command_works(Path(java_home) / "bin" / "java"):
+        return
+
+    java_path = shutil.which("java")
+    if java_path and _java_command_works(Path(java_path)):
+        return
+
+    for candidate in DEFAULT_JAVA_HOME_CANDIDATES:
+        if _java_command_works(candidate / "bin" / "java"):
+            os.environ["JAVA_HOME"] = str(candidate)
+            os.environ["PATH"] = f"{candidate / 'bin'}:{os.environ.get('PATH', '')}"
+            print(f"Using JAVA_HOME={candidate}")
+            return
+
+    raise RuntimeError(
+        "Java runtime not found. Install OpenJDK 17/21 and set JAVA_HOME or add java to PATH."
+    )
+
+
+def _java_command_works(java_path: Path) -> bool:
+    if not java_path.exists():
+        return False
+
+    result = subprocess.run(
+        [str(java_path), "-version"],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        check=False,
+    )
+    return result.returncode == 0
 
 
 def build_spark_session(source: str) -> SparkSession:
@@ -93,6 +133,29 @@ def build_summary(stream_df):
     )
 
 
+def write_parquet_snapshot(batch_df, batch_id: int, output_dir: str) -> None:
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+
+    enriched_batch = (
+        batch_df
+        .withColumn("window_start", F.col("window.start"))
+        .withColumn("window_end", F.col("window.end"))
+        .drop("window")
+        .withColumn("snapshot_batch_id", F.lit(batch_id))
+        .withColumn("snapshot_written_at", F.current_timestamp())
+    )
+
+    (
+        enriched_batch
+        .write
+        .mode("overwrite")
+        .parquet(str(output_path))
+    )
+
+    print(f"Wrote parquet snapshot for batch {batch_id} to {output_path}")
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Run Spark Structured Streaming on Kafka or file-based ski weather batches.",
@@ -126,8 +189,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--output-mode",
         choices=["console", "parquet"],
-        default="console",
-        help="Where to write aggregated output. Default: console",
+        default="parquet",
+        help="Where to write aggregated output. Default: parquet",
     )
     parser.add_argument(
         "--stream-output-mode",
@@ -137,14 +200,21 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--output-dir",
-        default=str(PROJECT_ROOT / "data" / "out"),
-        help="Directory for parquet output when output mode is parquet.",
+        default=str(PROJECT_ROOT / "data" / "out" / "streaming_summary"),
+        help="Directory for parquet snapshot output when output mode is parquet.",
+    )
+    parser.add_argument(
+        "--trigger-seconds",
+        type=int,
+        default=10,
+        help="Micro-batch trigger interval in seconds. Default: 10",
     )
     return parser.parse_args()
 
 
 def main():
     args = parse_args()
+    ensure_java_home()
     spark = build_spark_session(args.source)
     spark.sparkContext.setLogLevel("WARN")
 
@@ -158,17 +228,26 @@ def main():
         stream_df = build_file_stream(spark, args.input_dir)
 
     summary_df = build_summary(stream_df)
+    Path(args.checkpoint_dir).mkdir(parents=True, exist_ok=True)
+    Path(args.output_dir).mkdir(parents=True, exist_ok=True)
+
     writer = (
         summary_df.writeStream
         .outputMode(args.stream_output_mode)
         .option("checkpointLocation", args.checkpoint_dir)
+        .trigger(processingTime=f"{args.trigger_seconds} seconds")
     )
 
     if args.output_mode == "parquet":
         query = (
             writer
-            .format("parquet")
-            .option("path", args.output_dir)
+            .foreachBatch(
+                lambda batch_df, batch_id: write_parquet_snapshot(
+                    batch_df=batch_df,
+                    batch_id=batch_id,
+                    output_dir=args.output_dir,
+                )
+            )
             .start()
         )
     else:

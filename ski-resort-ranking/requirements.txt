@@ -3,3 +3,5 @@ requests
 python-dotenv
 kafka-python
 snowflake-connector-python[pandas]
+pyspark
+streamlit

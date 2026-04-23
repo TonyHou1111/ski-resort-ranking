@@ -1,34 +1,22 @@
 import os
 from datetime import datetime, timezone
+from pathlib import Path
+import sys
 
-from dotenv import load_dotenv
-import snowflake.connector
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
-
-def get_required_env(name: str) -> str:
-    value = os.getenv(name)
-    if not value:
-        raise RuntimeError(f"Missing required environment variable: {name}")
-    return value
-
-
-def get_connection():
-    return snowflake.connector.connect(
-        account=get_required_env("SNOWFLAKE_ACCOUNT"),
-        user=get_required_env("SNOWFLAKE_USER"),
-        password=get_required_env("SNOWFLAKE_PASSWORD"),
-        warehouse=get_required_env("SNOWFLAKE_WAREHOUSE"),
-        database=get_required_env("SNOWFLAKE_DATABASE"),
-        schema=get_required_env("SNOWFLAKE_SCHEMA"),
-        role=os.getenv("SNOWFLAKE_ROLE"),
-    )
+from src.storage.snowflake_utils import get_connection, load_environment, normalize_identifier
 
 
 def main() -> None:
-    load_dotenv()
+    load_environment()
 
     connection = get_connection()
-    table_name = os.getenv("SNOWFLAKE_TEST_TABLE", "SKI_PIPELINE_CONNECTION_TEST")
+    table_name = normalize_identifier(
+        os.getenv("SNOWFLAKE_TEST_TABLE", "SKI_PIPELINE_CONNECTION_TEST")
+    )
     inserted_at = datetime.now(timezone.utc).isoformat()
 
     try:
