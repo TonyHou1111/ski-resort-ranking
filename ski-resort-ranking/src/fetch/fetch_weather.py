@@ -52,6 +52,7 @@ def fetch_one_resort_weather(resort: dict) -> dict:
     data = response.json()
 
     result = {
+        # Store fetch time separately from forecast hours so downstream code can track ingestion freshness.
         "fetched_at": datetime.now(timezone.utc).isoformat(),
         "resort_name": resort["resort_name"],
         "latitude": lat,

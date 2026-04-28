@@ -24,6 +24,7 @@ def run_pipeline():
     processed_dir = project_root / "data" / "processed"
     processed_dir.mkdir(parents=True, exist_ok=True)
 
+    # Keep each intermediate artifact so batch outputs can be inspected independently.
     normalized_file = processed_dir / "weather_normalized.csv"
     normalized_df.to_csv(normalized_file, index=False)
     print(f"Saved normalized data to: {normalized_file}")

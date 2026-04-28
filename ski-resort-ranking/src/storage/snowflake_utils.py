@@ -82,6 +82,7 @@ def get_connection_params() -> dict:
 
     auth_method = get_auth_method()
     if auth_method == "key_pair":
+        # Key-pair auth matches the course environment and avoids embedding passwords in scripts.
         params.update({
             "authenticator": "SNOWFLAKE_JWT",
             "private_key_file": get_private_key_file(),
@@ -117,6 +118,7 @@ def write_dataframe_to_table(
     if df.empty:
         raise ValueError("Cannot write an empty DataFrame to Snowflake.")
 
+    # Normalize columns before upload so pandas/Snowflake naming stays predictable.
     normalized_df = normalize_dataframe_columns(df)
     normalized_table = normalize_identifier(table_name)
 

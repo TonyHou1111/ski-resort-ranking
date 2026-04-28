@@ -41,6 +41,7 @@ def run_batch(
         return 0
 
     if output_mode == "file":
+        # File mode mirrors the Kafka payload shape and is easier to demo locally.
         target_dir = landing_dir or (PROJECT_ROOT / "data" / "landing")
         write_jsonl_batch(messages, target_dir)
     else:
@@ -61,6 +62,7 @@ def run_loop(
     landing_dir: Path | None = None,
     bootstrap_servers: str | None = None,
 ) -> None:
+    # Clamp the interval so an accidental 0 does not create a tight loop.
     interval_seconds = max(interval_minutes, 0.1) * 60
 
     while True:

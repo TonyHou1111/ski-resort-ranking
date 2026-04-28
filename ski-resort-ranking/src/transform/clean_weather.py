@@ -39,6 +39,7 @@ def transform_one_resort(raw: dict) -> pd.DataFrame:
     wind_speeds = get_hourly_values(hourly, "wind_speed_10m", len(times))
     snow_depth = get_hourly_values(hourly, "snow_depth", len(times))
 
+    # Guard against uneven arrays so a partial API field does not break row alignment.
     min_len = min(len(times), len(snowfall), len(temperatures), len(wind_speeds), len(snow_depth))
 
     df = pd.DataFrame({

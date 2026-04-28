@@ -88,6 +88,7 @@ def main() -> None:
 
     scored_df = get_scored_dataframe()
 
+    # Derive secondary tables from the same scored dataset to keep Snowflake loads consistent.
     source_to_df = {
         "scored": scored_df,
         "summary": get_summary_dataframe(scored_df),

@@ -35,6 +35,7 @@ def compute_scores(df: pd.DataFrame) -> pd.DataFrame:
     wind_speed = get_numeric_column(df, "wind_speed")
     snow_depth = get_numeric_column(df, "snow_depth")
 
+    # Reference values turn raw weather units into bounded 0-100 sub-scores.
     # Higher snowfall and deeper base snow improve ski conditions.
     df["snow_score"] = clip_score(snowfall / SNOWFALL_REFERENCE_CM)
     df["depth_score"] = clip_score(snow_depth / SNOW_DEPTH_REFERENCE_M)

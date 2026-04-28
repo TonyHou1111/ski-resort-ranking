@@ -63,6 +63,7 @@ def build_spark_session(source: str) -> SparkSession:
     if spark_master_port and slurmd_nodename:
         builder = builder.master(f"spark://{slurmd_nodename}:{spark_master_port}")
     else:
+        # Default to local mode so the job still runs on a laptop without a cluster.
         builder = builder.master("local[*]")
 
     if source == "kafka":
@@ -125,6 +126,7 @@ def build_summary(stream_df):
     return (
         stream_df
         .groupBy(
+            # Window on ingest_time so the summary reflects when records entered the pipeline.
             F.window("ingest_time", "10 minutes"),
             F.col("resort_name"),
         )
@@ -153,6 +155,7 @@ def write_parquet_snapshot(batch_df, batch_id: int, output_dir: str) -> None:
     (
         enriched_batch
         .write
+        # Overwrite keeps this directory as a "latest snapshot" for the dashboard loader.
         .mode("overwrite")
         .parquet(str(output_path))
     )

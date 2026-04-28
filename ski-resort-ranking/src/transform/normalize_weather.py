@@ -16,6 +16,7 @@ def get_numeric_column(df: pd.DataFrame, column_name: str) -> pd.Series:
 def normalize_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     normalized_df = pd.DataFrame()
 
+    # This step standardizes names and schema; numeric scoring happens later.
     normalized_df["resort_id"] = df["resort_name"].apply(make_resort_id)
     normalized_df["resort_name"] = df["resort_name"]
     normalized_df["fetched_at"] = pd.to_datetime(df["fetched_at"])

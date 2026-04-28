@@ -11,6 +11,7 @@ def write_jsonl_batch(
     path = Path(output_dir)
     path.mkdir(parents=True, exist_ok=True)
 
+    # Timestamped files let Spark pick up each batch without overwriting prior inputs.
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     output_file = path / f"{prefix}_{timestamp}.jsonl"
 

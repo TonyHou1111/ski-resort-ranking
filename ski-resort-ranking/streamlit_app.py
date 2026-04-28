@@ -86,6 +86,7 @@ def convert_dataframe_times(df: pd.DataFrame, columns: list[str]) -> pd.DataFram
 def load_latest_streaming_snapshot() -> pd.DataFrame:
     table_name = get_table_name("SNOWFLAKE_STREAMING_SUMMARY_TABLE", DEFAULT_STREAMING_TABLE)
     query = f"""
+        -- Pick the newest Spark snapshot so the overview tab behaves like a live dashboard.
         WITH latest_snapshot AS (
             SELECT MAX(SNAPSHOT_BATCH_ID) AS SNAPSHOT_BATCH_ID
             FROM {table_name}

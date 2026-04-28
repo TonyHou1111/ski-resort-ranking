@@ -23,6 +23,7 @@ def compute_summary_ranking(df: pd.DataFrame) -> pd.DataFrame:
         )
     )
 
+    # Rank resorts by their average score across the available forecast horizon.
     summary_df = summary_df.sort_values(by="avg_score", ascending=False).reset_index(drop=True)
     summary_df["rank"] = summary_df.index + 1
 

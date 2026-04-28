@@ -29,6 +29,7 @@ def extract_public_key_body(path: Path) -> str:
     body_lines = [
         line.strip()
         for line in lines
+        # Snowflake expects the base64 body, not the PEM wrapper lines.
         if line.strip()
         and "BEGIN PUBLIC KEY" not in line
         and "END PUBLIC KEY" not in line

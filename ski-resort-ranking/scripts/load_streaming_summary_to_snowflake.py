@@ -32,6 +32,7 @@ def load_streaming_summary(input_dir: Path) -> pd.DataFrame:
             "Run the Spark streaming job with parquet output first."
         )
 
+    # Spark writes a directory of parquet parts; pandas can read the whole snapshot at once.
     df = pd.read_parquet(input_dir)
     if df.empty:
         raise ValueError(f"No rows found in streaming summary parquet: {input_dir}")

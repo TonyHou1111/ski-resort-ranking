@@ -48,6 +48,7 @@ def dataframe_to_messages(df: pd.DataFrame) -> list[dict]:
 
     for row in df.to_dict(orient="records"):
         message = {key: _serialize_value(value) for key, value in row.items()}
+        # These fields are generated at publish time for streaming lineage and windowing.
         message["ingest_time"] = ingest_time
         message["batch_id"] = batch_id
         messages.append(message)

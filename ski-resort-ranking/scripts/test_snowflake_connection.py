@@ -29,6 +29,7 @@ def main() -> None:
             print(f"Database: {database}")
             print(f"Schema: {schema}")
 
+            # Create a lightweight write target so the test verifies more than authentication.
             cursor.execute(
                 f"""
                 CREATE TABLE IF NOT EXISTS {table_name} (
