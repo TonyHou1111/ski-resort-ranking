@@ -96,4 +96,6 @@ docker compose down
 pkill -f 'spark_streaming_job.py'
 pkill -f 'streamlit_app.py'
 pkill -f 'run_streaming_producer.py'
+rm -rf tmp/checkpoint_streaming
+rm -rf data/out/streaming_summary
 ```
